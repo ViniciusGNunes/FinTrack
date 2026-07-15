@@ -24,7 +24,7 @@ public class UserService
             return await _context.Users
                 .Select(u => new UserDto
                 {
-                    UserID = u.UserID,
+                    UserID = u.Id,
                     Name = u.Name,
                     Email = u.Email
                 })
@@ -45,10 +45,10 @@ public class UserService
                 throw new ArgumentException("Invalid user ID.");
 
             return await _context.Users
-                .Where(u => u.UserID == userId)
+                .Where(u => u.Id == userId)
                 .Select(u => new UserDto
                 {
-                    UserID = u.UserID,
+                    UserID = u.Id,
                     Name = u.Name,
                     Email = u.Email
                 })
@@ -93,7 +93,7 @@ public class UserService
 
             return new UserDto
             {
-                UserID = user.UserID,
+                UserID = user.Id,
                 Name = user.Name,
                 Email = user.Email
             };
@@ -138,7 +138,7 @@ public class UserService
 
             return new UserDto
             {
-                UserID = user.UserID,
+                UserID = user.Id,
                 Name = user.Name,
                 Email = user.Email
             };
@@ -157,7 +157,7 @@ public class UserService
             ArgumentNullException.ThrowIfNull(dto);
 
             User? existingUser = await _context.Users
-                .FirstOrDefaultAsync(u => u.UserID == dto.UserID);
+                .FirstOrDefaultAsync(u => u.Id == dto.UserID);
 
             if (existingUser is null)
                 return false;
@@ -166,7 +166,7 @@ public class UserService
 
             bool emailExists = await _context.Users.AnyAsync(u =>
                 u.Email == email &&
-                u.UserID != dto.UserID);
+                u.Id != dto.UserID);
 
             if (emailExists)
                 throw new InvalidOperationException("Email already exists.");
@@ -196,7 +196,7 @@ public class UserService
                 throw new ArgumentException("Invalid user ID.");
 
             User? user = await _context.Users
-                .FirstOrDefaultAsync(u => u.UserID == userId);
+                .FirstOrDefaultAsync(u => u.Id == userId);
 
             if (user is null)
                 return false;
