@@ -1,20 +1,24 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using FinTrack.DTO; 
 
 public class UserService
 {
     private readonly AppDbContext _context;
     private readonly ILogger<UserService> _logger;
-    private readonly IPasswordHasher<User> _passwordHasher;
+    private readonly UserManager<User> _userManager;
+    private readonly JwtService _jwt;
 
     public UserService(
         AppDbContext context,
         ILogger<UserService> logger,
-        IPasswordHasher<User> passwordHasher)
+        UserManager<User> userManager,
+        JwtService jwt)
     {
         _context = context;
         _logger = logger;
-        _passwordHasher = passwordHasher;
+        _userManager = userManager;
+        _jwt = jwt;
     }
 
     public async Task<List<UserDto>> GetUsersAsync()
@@ -69,31 +73,27 @@ public class UserService
         try
         {
             ArgumentNullException.ThrowIfNull(dto);
-
             string email = dto.Email.Trim().ToLowerInvariant();
-
-            bool exists = await _context.Users
-                .AnyAsync(u => u.Email == email);
-
-            if (exists)
-                throw new InvalidOperationException("Email already exists.");
 
             User user = new()
             {
                 Name = dto.Name.Trim(),
                 Email = email,
-                PasswordHash = string.Empty
+                UserName = email
             };
 
-            user.PasswordHash =
-                _passwordHasher.HashPassword(user, dto.Password);
+            // EF Core automatically populates user.Id during this database insert tracking
+            var result = await _userManager.CreateAsync(user, dto.Password);
 
-            await _context.Users.AddAsync(user);
-            await _context.SaveChangesAsync();
+            if (!result.Succeeded)
+            {
+                var errorMessages = string.Join(" ", result.Errors.Select(e => e.Description));
+                throw new InvalidOperationException(errorMessages);
+            }
 
             return new UserDto
             {
-                UserID = user.Id,
+                UserID = user.Id, // Already populated!
                 Name = user.Name,
                 Email = user.Email
             };
@@ -110,31 +110,16 @@ public class UserService
         try
         {
             ArgumentNullException.ThrowIfNull(dto);
-
             string email = dto.Email.Trim().ToLowerInvariant();
 
-            User? user = await _context.Users
-                .FirstOrDefaultAsync(u => u.Email == email);
-
+            var user = await _userManager.FindByEmailAsync(email);
             if (user is null)
                 return null;
 
-            PasswordVerificationResult result =
-                _passwordHasher.VerifyHashedPassword(
-                    user,
-                    user.PasswordHash,
-                    dto.Password);
-
-            if (result == PasswordVerificationResult.Failed)
+            bool isPasswordValid = await _userManager.CheckPasswordAsync(user, dto.Password);
+            if (!isPasswordValid)
                 return null;
 
-            if (result == PasswordVerificationResult.SuccessRehashNeeded)
-            {
-                user.PasswordHash =
-                    _passwordHasher.HashPassword(user, dto.Password);
-
-                await _context.SaveChangesAsync();
-            }
 
             return new UserDto
             {
@@ -156,25 +141,27 @@ public class UserService
         {
             ArgumentNullException.ThrowIfNull(dto);
 
-            User? existingUser = await _context.Users
-                .FirstOrDefaultAsync(u => u.Id == dto.UserID);
-
+            User? existingUser = await _userManager.FindByIdAsync(dto.UserID.ToString());
             if (existingUser is null)
                 return false;
 
             string email = dto.Email.Trim().ToLowerInvariant();
 
-            bool emailExists = await _context.Users.AnyAsync(u =>
-                u.Email == email &&
-                u.Id != dto.UserID);
-
-            if (emailExists)
+            User? userWithEmail = await _userManager.FindByEmailAsync(email);
+            if (userWithEmail != null && userWithEmail.Id != dto.UserID)
                 throw new InvalidOperationException("Email already exists.");
 
             existingUser.Name = dto.Name.Trim();
             existingUser.Email = email;
+            existingUser.UserName = email;
 
-            await _context.SaveChangesAsync();
+            var result = await _userManager.UpdateAsync(existingUser);
+            if (!result.Succeeded)
+            {
+                var errorMessages = string.Join(" ", result.Errors.Select(e => e.Description));
+                throw new InvalidOperationException(errorMessages);
+            }
+
 
             return true;
         }
@@ -195,15 +182,16 @@ public class UserService
             if (userId <= 0)
                 throw new ArgumentException("Invalid user ID.");
 
-            User? user = await _context.Users
-                .FirstOrDefaultAsync(u => u.Id == userId);
-
+            User? user = await _userManager.FindByIdAsync(userId.ToString());
             if (user is null)
                 return false;
 
-            _context.Users.Remove(user);
-
-            await _context.SaveChangesAsync();
+            var result = await _userManager.DeleteAsync(user);
+            if (!result.Succeeded)
+            {
+                var errorMessages = string.Join(" ", result.Errors.Select(e => e.Description));
+                throw new InvalidOperationException(errorMessages);
+            }
 
             return true;
         }
@@ -217,3 +205,4 @@ public class UserService
         }
     }
 }
+

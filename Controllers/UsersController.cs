@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 [ApiController]
@@ -5,14 +6,18 @@ using Microsoft.AspNetCore.Mvc;
 public class UsersController : ControllerBase
 {
     private readonly UserService _userService;
+    private readonly JwtService _jwtService; 
 
-    public UsersController(UserService userService)
+    public UsersController(UserService userService, JwtService jwtService)
     {
         _userService = userService;
+        _jwtService = jwtService;
     }
 
     [HttpGet]
+    [Authorize] 
     [ProducesResponseType(typeof(IEnumerable<UserDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<ActionResult<IEnumerable<UserDto>>> GetUsers()
     {
         var users = await _userService.GetUsersAsync();
@@ -20,7 +25,9 @@ public class UsersController : ControllerBase
     }
 
     [HttpGet("{userID:int}")]
+    [Authorize] 
     [ProducesResponseType(typeof(UserDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<UserDto>> GetUser(int userID)
     {
@@ -33,18 +40,28 @@ public class UsersController : ControllerBase
     }
 
     [HttpPost("register")]
-    [ProducesResponseType(typeof(UserDto), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(object), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
-    public async Task<ActionResult<UserDto>> Register([FromBody] RegisterDto register)
+    public async Task<ActionResult> Register([FromBody] RegisterDto register)
     {
         try
         {
-            var createdUser = await _userService.RegisterUserAsync(register);
+            var userDto = await _userService.RegisterUserAsync(register);
+
+            var userEntity = new User
+            {
+                Id = userDto.UserID,
+                Email = userDto.Email,
+                Name = userDto.Name
+            };
+
+            var token = _jwtService.GenerateToken(userEntity);
+
 
             return CreatedAtAction(
                 nameof(GetUser),
-                new { userID = createdUser.UserID },
-                createdUser);
+                new { userID = userDto.UserID },
+                new { Token = token, User = userDto });
         }
         catch (InvalidOperationException ex)
         {
@@ -53,21 +70,36 @@ public class UsersController : ControllerBase
     }
 
     [HttpPost("login")]
-    [ProducesResponseType(typeof(UserDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    public async Task<ActionResult<UserDto>> Login([FromBody] LoginDto login)
+    public async Task<ActionResult> Login([FromBody] LoginDto login)
     {
-        var user = await _userService.LoginAsync(login);
+        var userDto = await _userService.LoginAsync(login);
 
-        if (user is null)
+        if (userDto is null)
             return Unauthorized("Invalid email or password.");
 
-        return Ok(user);
+        var userEntity = new User
+        {
+            Id = userDto.UserID,
+            Email = userDto.Email,
+            Name = userDto.Name
+        };
+
+        var token = _jwtService.GenerateToken(userEntity);
+
+        return Ok(new
+        {
+            Token = token,
+            User = userDto
+        });
     }
 
     [HttpPut("{userID:int}")]
+    [Authorize] 
     [ProducesResponseType(typeof(UserDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<ActionResult<UserDto>> Update(
@@ -95,7 +127,9 @@ public class UsersController : ControllerBase
     }
 
     [HttpDelete("{userID:int}")]
+    [Authorize] 
     [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Delete(int userID)
     {
