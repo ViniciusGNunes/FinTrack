@@ -33,9 +33,11 @@ public class JwtService
             audience: _configuration["Jwt:Audience"],
             claims: claims,
             expires: DateTime.UtcNow.AddMinutes(
-                int.Parse(_configuration["Jwt:ExpireMinutes"]!)),
+                int.Parse(_configuration["Jwt:ExpireMinutes"])),
             signingCredentials: credentials);
 
-        return new JwtSecurityTokenHandler().WriteToken(token);
+        var tokenString = new JwtSecurityTokenHandler().WriteToken(token);
+
+        return tokenString;
     }
 }
