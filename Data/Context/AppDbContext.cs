@@ -9,4 +9,7 @@ public class AppDbContext : IdentityDbContext<User, IdentityRole<int>,int>
     {
     }
 
+    public DbSet<Expense> Expenses {get;set;}
+    public DbSet<Transaction> Transactions { get; set; }
+
 }
