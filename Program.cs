@@ -37,20 +37,6 @@ builder.Services.AddIdentityCore<User>(options =>
 var jwtSettings = builder.Configuration.GetSection("Jwt");
 var key = Encoding.UTF8.GetBytes(jwtSettings["Secret"]!);
 
-//builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-//    .AddJwtBearer(options =>
-//    {
-//        options.TokenValidationParameters = new TokenValidationParameters
-//        {
-//            ValidateIssuer = true,
-//            ValidateAudience = true,
-//            ValidateLifetime = true,
-//            ValidateIssuerSigningKey = true,
-//            ValidIssuer = jwtSettings["Issuer"],
-//            ValidAudience = jwtSettings["Audience"],
-//            IssuerSigningKey = new SymmetricSecurityKey(key)
-//        };
-//    });
 
 builder.Services.AddAuthentication(options =>
 {
@@ -86,6 +72,9 @@ builder.Services.AddAuthorization();
 
 builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<JwtService>();
+builder.Services.AddScoped<TransactionService>();
+builder.Services.AddScoped<ExpenseService>();
+builder.Services.AddScoped<CategoryService>();
 
 var app = builder.Build();
 

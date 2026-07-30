@@ -26,7 +26,7 @@ public class TransactionsController : ControllerBase
         var transaction = await _service.GetByIdAsync(id);
         if (transaction == null)
         {
-            return NotFound($"Transaction with ID {id} was not found.");
+            return NotFound(new { message = $"Transaction with ID {id} was not found." });
         }
 
         return Ok(transaction);
@@ -36,11 +36,6 @@ public class TransactionsController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<TransactionReadDto>> Create([FromBody] TransactionCreateDto dto)
     {
-        if (!ModelState.IsValid)
-        {
-            return BadRequest(ModelState);
-        }
-
         var created = await _service.CreateAsync(dto);
         return CreatedAtAction(nameof(GetById), new { id = created.TransactionID }, created);
     }
@@ -49,15 +44,10 @@ public class TransactionsController : ControllerBase
     [HttpPut("{id:int}")]
     public async Task<IActionResult> Update(int id, [FromBody] TransactionUpdateDto dto)
     {
-        if (!ModelState.IsValid)
-        {
-            return BadRequest(ModelState);
-        }
-
         var updated = await _service.UpdateAsync(id, dto);
         if (!updated)
         {
-            return NotFound($"Transaction with ID {id} was not found.");
+            return NotFound(new { message = $"Transaction with ID {id} was not found." });
         }
 
         return NoContent();
@@ -70,7 +60,7 @@ public class TransactionsController : ControllerBase
         var deleted = await _service.DeleteAsync(id);
         if (!deleted)
         {
-            return NotFound($"Transaction with ID {id} was not found.");
+            return NotFound(new { message = $"Transaction with ID {id} was not found." });
         }
 
         return NoContent();
