@@ -21,10 +21,6 @@ public class TransactionCreateDto
 
     public bool IsRecurrent { get; set; }
     public RecurrenceInterval RecurrenceInterval { get; set; } = RecurrenceInterval.None;
-
-    /// <summary>
-    /// Initial date when the first payment is due or paid.
-    /// </summary>
     public DateTime FirstDueDate { get; set; } = DateTime.UtcNow;
 
     public int UserID { get; set; }

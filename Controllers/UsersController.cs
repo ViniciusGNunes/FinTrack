@@ -160,10 +160,10 @@ public class UsersController : ControllerBase
 
         var cookieOptions = new CookieOptions
         {
-            HttpOnly = true,
+            HttpOnly = false,
             Secure = isSecure,
             SameSite = sameSiteMode,
-            Expires = DateTime.UtcNow.AddMinutes(minutes)
+            Expires = DateTime.UtcNow.AddMinutes(minutes),
         };
 
         Response.Cookies.Append(cookieName, tokenString, cookieOptions);
