@@ -14,7 +14,6 @@ public class Category
     [MaxLength(10)]
     public string ColorHex { get; set; } = "#808080";
 
-    // Optional: Nullable for global categories, set if custom per-user
     public int? UserID { get; set; } 
 
     public ICollection<Transaction> Transactions { get; set; } = new List<Transaction>();

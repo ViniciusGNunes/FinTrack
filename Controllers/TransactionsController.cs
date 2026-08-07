@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 
 [ApiController]
-[Route("api/[controller]")]
+[Route("v1/api/[controller]")]
 public class TransactionsController : ControllerBase
 {
     private readonly TransactionService _service;

@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace FinanceApp.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
+[Route("v1/api/[controller]")]
 public class CategoriesController : ControllerBase
 {
     private readonly CategoryService _service;
