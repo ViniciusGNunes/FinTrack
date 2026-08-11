@@ -11,7 +11,6 @@ public class TransactionsController : ControllerBase
         _service = service;
     }
 
-    // GET: api/transactions?userId=1
     [HttpGet]
     public async Task<ActionResult<IEnumerable<TransactionReadDto>>> GetAll([FromQuery] int? userId)
     {
@@ -19,7 +18,6 @@ public class TransactionsController : ControllerBase
         return Ok(transactions);
     }
 
-    // GET: api/transactions/5
     [HttpGet("{id:int}")]
     public async Task<ActionResult<TransactionReadDto>> GetById(int id)
     {
@@ -32,7 +30,6 @@ public class TransactionsController : ControllerBase
         return Ok(transaction);
     }
 
-    // POST: api/transactions
     [HttpPost]
     public async Task<ActionResult<TransactionReadDto>> Create([FromBody] TransactionCreateDto dto)
     {
@@ -40,7 +37,6 @@ public class TransactionsController : ControllerBase
         return CreatedAtAction(nameof(GetById), new { id = created.TransactionID }, created);
     }
 
-    // PUT: api/transactions/5
     [HttpPut("{id:int}")]
     public async Task<IActionResult> Update(int id, [FromBody] TransactionUpdateDto dto)
     {
@@ -53,7 +49,6 @@ public class TransactionsController : ControllerBase
         return NoContent();
     }
 
-    // DELETE: api/transactions/5
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> Delete(int id)
     {

@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 
 [ApiController]
-[Route("api/[controller]")]
+[Route("v1/api/[controller]")]
 public class ExpensesController : ControllerBase
 {
     private readonly ExpenseService _service;
@@ -11,18 +11,16 @@ public class ExpensesController : ControllerBase
         _service = service;
     }
 
-    // GET: api/expenses/monthly?userId=1&month=8&year=2026
     [HttpGet("monthly")]
     public async Task<ActionResult<IEnumerable<DetailedExpenseReadDto>>> GetMonthly(
-        [FromQuery] int userId, 
-        [FromQuery] int month, 
+        [FromQuery] int userId,
+        [FromQuery] int month,
         [FromQuery] int year)
     {
         var expenses = await _service.GetMonthlyExpensesAsync(userId, month, year);
         return Ok(expenses);
     }
 
-    // GET: api/expenses/overdue?userId=1
     [HttpGet("overdue")]
     public async Task<ActionResult<IEnumerable<DetailedExpenseReadDto>>> GetOverdue([FromQuery] int userId)
     {
@@ -30,7 +28,6 @@ public class ExpensesController : ControllerBase
         return Ok(expenses);
     }
 
-    // GET: api/expenses/5
     [HttpGet("{id:int}")]
     public async Task<ActionResult<DetailedExpenseReadDto>> GetById(int id)
     {
@@ -43,7 +40,6 @@ public class ExpensesController : ControllerBase
         return Ok(expense);
     }
 
-    // POST: api/expenses/5/pay
     [HttpPost("{id:int}/pay")]
     public async Task<IActionResult> MarkAsPaid(int id, [FromBody] PayExpenseDto dto)
     {
@@ -56,7 +52,6 @@ public class ExpensesController : ControllerBase
         return NoContent();
     }
 
-    // POST: api/expenses/5/partial-pay
     [HttpPost("{id:int}/partial-pay")]
     public async Task<IActionResult> PartialPay(int id, [FromBody] PartialPayExpenseDto dto)
     {
@@ -74,7 +69,30 @@ public class ExpensesController : ControllerBase
         return NoContent();
     }
 
-    // PATCH: api/expenses/5/amount
+    [HttpPost("{id:int}/refund")]
+    public async Task<IActionResult> RegisterRefund(int id, [FromBody] RefundExpenseDto dto)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        try
+        {
+            var updated = await _service.RegisterRefundAsync(id, dto);
+            if (!updated)
+            {
+                return NotFound(new { message = $"Expense with ID {id} was not found." });
+            }
+
+            return NoContent();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
     [HttpPatch("{id:int}/amount")]
     public async Task<IActionResult> UpdateAmount(int id, [FromBody] UpdateExpenseAmountDto dto)
     {

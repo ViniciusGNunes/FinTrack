@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 
-namespace FinanceApp.Controllers;
+namespace FinTrack.Controllers;
 
 [ApiController]
 [Route("v1/api/[controller]")]

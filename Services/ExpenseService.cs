@@ -1,4 +1,4 @@
-using FinanceApp.Domain.Enums;
+using FinTrack.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 public class ExpenseService
 {
@@ -9,7 +9,6 @@ public class ExpenseService
         _context = context;
     }
 
-    // 1. DASHBOARD QUERY: Get Expenses by Month/Year
     public async Task<IEnumerable<DetailedExpenseReadDto>> GetMonthlyExpensesAsync(int userId, int month, int year)
     {
         var startDate = new DateTime(year, month, 1, 0, 0, 0, DateTimeKind.Utc);
@@ -19,14 +18,16 @@ public class ExpenseService
             .AsNoTracking()
             .Include(e => e.Transaction)
                 .ThenInclude(t => t!.Category)
-            .Where(e => e.UserID == userId && e.DueDate >= startDate && e.DueDate <= endDate)
+            .Where(e => e.UserID == userId
+                     && e.DueDate >= startDate
+                     && e.DueDate <= endDate
+                     && e.Status != ExpenseStatus.Cancelled)
             .OrderBy(e => e.DueDate)
             .ToListAsync();
 
         return expenses.Select(MapToDetailedDto);
     }
 
-    // 2. DASHBOARD QUERY: Get Overdue Expenses
     public async Task<IEnumerable<DetailedExpenseReadDto>> GetOverdueExpensesAsync(int userId)
     {
         var now = DateTime.UtcNow;
@@ -35,9 +36,10 @@ public class ExpenseService
             .AsNoTracking()
             .Include(e => e.Transaction)
                 .ThenInclude(t => t!.Category)
-            .Where(e => e.UserID == userId 
-                     && e.Status != ExpenseStatus.Paid 
+            .Where(e => e.UserID == userId
+                     && e.Status != ExpenseStatus.Paid
                      && e.Status != ExpenseStatus.Cancelled
+                     && e.Status != ExpenseStatus.Refunded
                      && e.DueDate < now)
             .OrderBy(e => e.DueDate)
             .ToListAsync();
@@ -45,7 +47,6 @@ public class ExpenseService
         return expenses.Select(MapToDetailedDto);
     }
 
-    // 3. GET BY ID
     public async Task<DetailedExpenseReadDto?> GetByIdAsync(int id)
     {
         var expense = await _context.Expenses
@@ -57,7 +58,6 @@ public class ExpenseService
         return expense == null ? null : MapToDetailedDto(expense);
     }
 
-    // 4. MARK FULLY PAID
     public async Task<bool> MarkAsPaidAsync(int id, PayExpenseDto dto)
     {
         var expense = await _context.Expenses
@@ -76,7 +76,6 @@ public class ExpenseService
         return true;
     }
 
-    // 5. PARTIAL PAYMENT
     public async Task<bool> ProcessPartialPaymentAsync(int id, PartialPayExpenseDto dto)
     {
         var expense = await _context.Expenses.FindAsync(id);
@@ -88,7 +87,7 @@ public class ExpenseService
 
         if (expense.PaidAmount >= expense.Amount)
         {
-            expense.PaidAmount = expense.Amount; // Clamp
+            expense.PaidAmount = expense.Amount;
             expense.Status = ExpenseStatus.Paid;
             await CheckAndCompleteParentTransactionAsync(expense.TransactionID);
         }
@@ -101,7 +100,39 @@ public class ExpenseService
         return true;
     }
 
-    // 6. UPDATE AMOUNT (for Variable Monthly Bills like AWS)
+    public async Task<bool> RegisterRefundAsync(int id, RefundExpenseDto dto)
+    {
+        var expense = await _context.Expenses
+            .Include(e => e.Transaction)
+            .FirstOrDefaultAsync(e => e.ExpenseID == id);
+
+        if (expense == null) return false;
+
+        if (expense.RefundedAmount + dto.RefundAmount > expense.Amount)
+        {
+            throw new InvalidOperationException("Refund amount cannot exceed the total expense amount.");
+        }
+
+        expense.RefundedAmount += dto.RefundAmount;
+        expense.RefundDate = dto.RefundDate ?? DateTime.UtcNow;
+        expense.RefundReason = dto.Reason;
+        expense.UpdatedAtUtc = DateTime.UtcNow;
+
+        expense.Status = expense.RefundedAmount >= expense.Amount
+            ? ExpenseStatus.Refunded
+            : ExpenseStatus.PartiallyRefunded;
+
+        // Propaga o valor reembolsado para a Transaction pai
+        if (expense.Transaction != null)
+        {
+            expense.Transaction.RefundedAmount += dto.RefundAmount;
+            expense.Transaction.UpdatedAtUtc = DateTime.UtcNow;
+        }
+
+        await _context.SaveChangesAsync();
+        return true;
+    }
+
     public async Task<bool> UpdateAmountAsync(int id, UpdateExpenseAmountDto dto)
     {
         var expense = await _context.Expenses.FindAsync(id);
@@ -110,7 +141,6 @@ public class ExpenseService
         expense.Amount = dto.NewAmount;
         expense.UpdatedAtUtc = DateTime.UtcNow;
 
-        // Recalculate status in case paid amount now covers it or drops back down
         if (expense.PaidAmount >= expense.Amount && expense.Amount > 0)
         {
             expense.Status = ExpenseStatus.Paid;
@@ -128,7 +158,6 @@ public class ExpenseService
         return true;
     }
 
-    // Helper: Check if all child expenses are paid; if so, mark parent Transaction as Completed
     private async Task CheckAndCompleteParentTransactionAsync(int transactionId)
     {
         var parent = await _context.Transactions
@@ -142,7 +171,6 @@ public class ExpenseService
         }
     }
 
-    // Mapping Helper
     private static DetailedExpenseReadDto MapToDetailedDto(Expense e)
     {
         return new DetailedExpenseReadDto
@@ -154,8 +182,11 @@ public class ExpenseService
             PaymentMethod = e.Transaction?.PaymentMethod ?? PaymentMethod.Cash,
             Amount = e.Amount,
             PaidAmount = e.PaidAmount,
+            RefundedAmount = e.RefundedAmount,
             DueDate = e.DueDate,
             PaidDate = e.PaidDate,
+            RefundDate = e.RefundDate,
+            RefundReason = e.RefundReason,
             CurrentInstallment = e.CurrentInstallment,
             TotalInstallments = e.Transaction?.TotalInstallments ?? 1,
             IsInstallment = e.Transaction?.IsInstallment ?? false,
@@ -164,4 +195,3 @@ public class ExpenseService
         };
     }
 }
-

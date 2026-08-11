@@ -1,4 +1,4 @@
-using FinanceApp.Domain.Enums;
+using FinTrack.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 
 public class TransactionService
@@ -10,7 +10,6 @@ public class TransactionService
         _context = context;
     }
 
-    // BROWSE / GET ALL
     public async Task<IEnumerable<TransactionReadDto>> GetAllAsync(int? userId = null)
     {
         var query = _context.Transactions
@@ -28,7 +27,6 @@ public class TransactionService
         return list.Select(MapToReadDto);
     }
 
-    // READ / GET BY ID
     public async Task<TransactionReadDto?> GetByIdAsync(int id)
     {
         var transaction = await _context.Transactions
@@ -40,12 +38,12 @@ public class TransactionService
         return transaction == null ? null : MapToReadDto(transaction);
     }
 
-    // ADD / CREATE
     public async Task<TransactionReadDto> CreateAsync(TransactionCreateDto dto)
     {
         var entity = new Transaction
         {
             Name = dto.Name,
+            Description = dto.Description,
             TotalAmount = dto.TotalAmount,
             Type = dto.Type,
             Status = TransactionStatus.Active,
@@ -60,19 +58,16 @@ public class TransactionService
             CreatedAtUtc = DateTime.UtcNow
         };
 
-        // Automatically build child Expenses based on rule parameters
         GenerateExpensesForTransaction(entity, dto.FirstDueDate);
 
         _context.Transactions.Add(entity);
         await _context.SaveChangesAsync();
 
-        // Re-load Category for complete Read DTO response
         await _context.Entry(entity).Reference(e => e.Category).LoadAsync();
 
         return MapToReadDto(entity);
     }
 
-    // EDIT / UPDATE (Header metadata update)
     public async Task<bool> UpdateAsync(int id, TransactionUpdateDto dto)
     {
         var entity = await _context.Transactions
@@ -82,16 +77,24 @@ public class TransactionService
         if (entity == null) return false;
 
         entity.Name = dto.Name;
+        entity.Description = dto.Description;
         entity.Type = dto.Type;
         entity.Status = dto.Status;
         entity.CategoryID = dto.CategoryID;
         entity.PaymentMethod = dto.PaymentMethod;
+        entity.CancellationDate = dto.CancellationDate;
         entity.UpdatedAtUtc = DateTime.UtcNow;
 
-        // If transaction is cancelled, cascade status to all pending expenses
+        // Regra de Cancelamento: Se a transação for cancelada, remove ou cancela expenses pendentes futuras
         if (dto.Status == TransactionStatus.Cancelled)
         {
-            foreach (var expense in entity.Expenses.Where(e => e.Status == ExpenseStatus.Pending))
+            DateTime effectiveDate = dto.CancellationDate ?? DateTime.UtcNow;
+
+            var pendingExpenses = entity.Expenses
+                .Where(e => e.Status == ExpenseStatus.Pending && e.DueDate >= effectiveDate)
+                .ToList();
+
+            foreach (var expense in pendingExpenses)
             {
                 expense.Status = ExpenseStatus.Cancelled;
                 expense.UpdatedAtUtc = DateTime.UtcNow;
@@ -102,13 +105,11 @@ public class TransactionService
         return true;
     }
 
-    // DELETE
     public async Task<bool> DeleteAsync(int id)
     {
         var entity = await _context.Transactions.FindAsync(id);
         if (entity == null) return false;
 
-        // EF Core handles cascading delete to Expenses automatically via Foreign Key
         _context.Transactions.Remove(entity);
         await _context.SaveChangesAsync();
         return true;
@@ -124,15 +125,16 @@ public class TransactionService
         }
         else
         {
-            // Single purchase or first cycle of a recurrent bill
+            bool isCreditCard = transaction.PaymentMethod == PaymentMethod.CreditCard;
+
             var expense = new Expense
             {
                 Amount = transaction.TotalAmount,
-                PaidAmount = transaction.PaymentMethod == PaymentMethod.CreditCard ? 0.00m : transaction.TotalAmount,
+                PaidAmount = isCreditCard ? 0.00m : transaction.TotalAmount,
                 DueDate = firstDueDate,
-                PaidDate = transaction.PaymentMethod == PaymentMethod.CreditCard ? null : DateTime.UtcNow,
+                PaidDate = isCreditCard ? null : DateTime.UtcNow,
                 CurrentInstallment = 1,
-                Status = transaction.PaymentMethod == PaymentMethod.CreditCard ? ExpenseStatus.Pending : ExpenseStatus.Paid,
+                Status = isCreditCard ? ExpenseStatus.Pending : ExpenseStatus.Paid,
                 UserID = transaction.UserID,
                 CreatedAtUtc = DateTime.UtcNow
             };
@@ -144,8 +146,7 @@ public class TransactionService
     private static void GenerateInstallmentExpenses(Transaction transaction, DateTime startDate)
     {
         int count = transaction.TotalInstallments;
-        
-        // Cent-rounding math fix
+
         decimal baseAmount = Math.Floor((transaction.TotalAmount / count) * 100m) / 100m;
         decimal remainder = transaction.TotalAmount - (baseAmount * count);
 
@@ -153,10 +154,7 @@ public class TransactionService
 
         for (int i = 1; i <= count; i++)
         {
-            // Add remainder cents to the very first installment line
             decimal installmentAmount = (i == 1) ? baseAmount + remainder : baseAmount;
-            
-            // Calculate date with date-drift safety
             DateTime dueDate = CalculateNextDate(startDate, i - 1, transaction.RecurrenceInterval, targetDay);
 
             var expense = new Expense
@@ -182,7 +180,7 @@ public class TransactionService
         {
             RecurrenceInterval.Weekly => baseDate.AddDays(7 * monthOffset),
             RecurrenceInterval.Yearly => baseDate.AddYears(monthOffset),
-            _ => AddMonthsSafely(baseDate, monthOffset, targetDay) // Monthly default
+            _ => AddMonthsSafely(baseDate, monthOffset, targetDay)
         };
     }
 
@@ -195,14 +193,15 @@ public class TransactionService
         return new DateTime(targetMonth.Year, targetMonth.Month, clampedDay, date.Hour, date.Minute, date.Second, date.Kind);
     }
 
-    // Mapping Helper
     private static TransactionReadDto MapToReadDto(Transaction t)
     {
         return new TransactionReadDto
         {
             TransactionID = t.TransactionID,
             Name = t.Name,
+            Description = t.Description,
             TotalAmount = t.TotalAmount,
+            RefundedAmount = t.RefundedAmount,
             Type = t.Type,
             Status = t.Status,
             CategoryID = t.CategoryID,
@@ -213,6 +212,7 @@ public class TransactionService
             IsRecurrent = t.IsRecurrent,
             RecurrenceInterval = t.RecurrenceInterval,
             RecurrenceTargetDay = t.RecurrenceTargetDay,
+            CancellationDate = t.CancellationDate,
             UserID = t.UserID,
             CreatedAtUtc = t.CreatedAtUtc,
             Expenses = t.Expenses.Select(e => new ExpenseReadDto
@@ -221,8 +221,11 @@ public class TransactionService
                 TransactionID = e.TransactionID,
                 Amount = e.Amount,
                 PaidAmount = e.PaidAmount,
+                RefundedAmount = e.RefundedAmount,
                 DueDate = e.DueDate,
                 PaidDate = e.PaidDate,
+                RefundDate = e.RefundDate,
+                RefundReason = e.RefundReason,
                 CurrentInstallment = e.CurrentInstallment,
                 Status = e.Status
             }).OrderBy(e => e.CurrentInstallment).ToList()

@@ -1,4 +1,4 @@
-namespace FinanceApp.Domain.Enums;
+namespace FinTrack.Domain.Enums;
 
 public enum PaymentMethod
 {
@@ -21,8 +21,7 @@ public enum RecurrenceInterval
 public enum TransactionType
 {
     Expense = 1,  // Money going out
-    Income = 2,   // Salary, side hustles
-    Refund = 3    // Returns, chargebacks
+    Income = 2    // Salary, side hustles, investment returns
 }
 
 public enum TransactionStatus
@@ -30,7 +29,8 @@ public enum TransactionStatus
     Active = 1,
     Completed = 2,
     Cancelled = 3,
-    Refunded = 4
+    Refunded = 4,
+    PartiallyRefunded = 5
 }
 
 public enum ExpenseStatus
@@ -39,5 +39,7 @@ public enum ExpenseStatus
     PartiallyPaid = 2,
     Paid = 3,
     Overdue = 4,
-    Cancelled = 5
+    Cancelled = 5,
+    PartiallyRefunded = 6,
+    Refunded = 7
 }
