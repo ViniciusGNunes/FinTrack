@@ -43,3 +43,17 @@ public enum ExpenseStatus
     PartiallyRefunded = 6,
     Refunded = 7
 }
+
+public enum TimeCategory{
+  Last = 1,
+  Current = 2,
+  Next = 3
+}
+
+public enum TimePeriod{
+  Day = 1,
+  Week = 2,
+  TwoWeeks = 3,
+  Month = 4,
+  Year = 5
+}
