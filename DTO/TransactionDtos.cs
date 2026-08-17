@@ -38,6 +38,8 @@ public class TransactionUpdateDto
     [MaxLength(500)]
     public string? Description { get; set; }
 
+    public decimal? TotalAmount { get; set; }
+
     public TransactionType Type { get; set; }
     public TransactionStatus Status { get; set; }
     public int CategoryID { get; set; }
