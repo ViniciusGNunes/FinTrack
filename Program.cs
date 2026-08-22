@@ -70,11 +70,14 @@ builder.Services.AddAuthentication(options =>
 
 builder.Services.AddAuthorization();
 
+builder.Services.AddHttpClient();
 builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<JwtService>();
 builder.Services.AddScoped<TransactionService>();
 builder.Services.AddScoped<ExpenseService>();
 builder.Services.AddScoped<CategoryService>();
+builder.Services.AddScoped<IMarketDataService, MarketDataService>();
+builder.Services.AddScoped<InvestmentService>();
 
 var app = builder.Build();
 

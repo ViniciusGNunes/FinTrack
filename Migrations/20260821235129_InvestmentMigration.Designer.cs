@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -10,9 +11,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace FinTrack.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260821235129_InvestmentMigration")]
+    partial class InvestmentMigration
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -127,7 +130,7 @@ namespace FinTrack.Migrations
                         .HasColumnType("character varying(10)");
 
                     b.Property<decimal?>("CurrentPricePerUnit")
-                        .HasColumnType("decimal(28,8)");
+                        .HasColumnType("decimal(18,4)");
 
                     b.Property<decimal>("CurrentValue")
                         .HasColumnType("decimal(18,2)");
@@ -153,10 +156,10 @@ namespace FinTrack.Migrations
                         .HasColumnType("character varying(100)");
 
                     b.Property<decimal?>("PurchasePricePerUnit")
-                        .HasColumnType("decimal(28,8)");
+                        .HasColumnType("decimal(18,4)");
 
                     b.Property<decimal?>("Quantity")
-                        .HasColumnType("decimal(28,8)");
+                        .HasColumnType("decimal(18,4)");
 
                     b.Property<int?>("RateType")
                         .HasColumnType("integer");
@@ -203,7 +206,7 @@ namespace FinTrack.Migrations
                         .HasColumnType("character varying(250)");
 
                     b.Property<decimal?>("Quantity")
-                        .HasColumnType("decimal(28,8)");
+                        .HasColumnType("decimal(18,4)");
 
                     b.Property<DateTime>("TransactionDate")
                         .HasColumnType("timestamp with time zone");
@@ -212,7 +215,7 @@ namespace FinTrack.Migrations
                         .HasColumnType("integer");
 
                     b.Property<decimal?>("UnitPrice")
-                        .HasColumnType("decimal(28,8)");
+                        .HasColumnType("decimal(18,4)");
 
                     b.HasKey("InvestmentTransactionID");
 
@@ -230,7 +233,7 @@ namespace FinTrack.Migrations
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("MarketPriceHistoryID"));
 
                     b.Property<decimal>("ClosePrice")
-                        .HasColumnType("decimal(28,8)");
+                        .HasColumnType("decimal(18,6)");
 
                     b.Property<DateOnly>("Date")
                         .HasColumnType("date");

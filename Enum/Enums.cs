@@ -57,3 +57,26 @@ public enum TimePeriod{
   Month = 4,
   Year = 5
 }
+
+public enum InvestmentType
+{
+    FixedIncome = 0,
+    VariableIncome = 1,
+    Crypto = 2
+}
+
+public enum FixedRateType
+{
+    Prefixado = 0,
+    Selic_CDI = 1,
+    IPCA_Plus = 2
+}
+
+public enum InvestmentTransactionType
+{
+    Buy = 0,          // Deposit / Buy shares
+    Sell = 1,         // Withdrawal / Sell shares
+    Liquidate = 2,    // Position fully closed
+    Dividend = 3,     // Yield / Dividend payout
+    StockSplit = 4    // Stock split / consolidation
+}

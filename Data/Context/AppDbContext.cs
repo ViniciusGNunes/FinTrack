@@ -12,5 +12,7 @@ public class AppDbContext : IdentityDbContext<User, IdentityRole<int>,int>
     public DbSet<Expense> Expenses {get;set;}
     public DbSet<Transaction> Transactions { get; set; }
     public DbSet<Category> Categories { get; set; }
-
+    public DbSet<Investment> Investments { get; set; }
+    public DbSet<InvestmentTransaction> InvestmentTransactions { get; set; }
+    public DbSet<MarketPriceHistory> MarketPriceHistories { get; set; }
 }
