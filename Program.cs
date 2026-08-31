@@ -19,7 +19,13 @@ builder.Services.AddCors(options =>
             .AllowCredentials();
     });
 });
-builder.Services.AddControllers();
+builder.Services.AddControllers(options =>
+{
+    var policy = new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder()
+        .RequireAuthenticatedUser()
+        .Build();
+    options.Filters.Add(new Microsoft.AspNetCore.Mvc.Authorization.AuthorizeFilter(policy));
+});
 
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
@@ -78,6 +84,9 @@ builder.Services.AddScoped<ExpenseService>();
 builder.Services.AddScoped<CategoryService>();
 builder.Services.AddScoped<IMarketDataService, MarketDataService>();
 builder.Services.AddScoped<InvestmentService>();
+builder.Services.AddScoped<DebtService>();
+builder.Services.AddScoped<ReceivableService>();
+builder.Services.AddScoped<GoalService>();
 
 var app = builder.Build();
 

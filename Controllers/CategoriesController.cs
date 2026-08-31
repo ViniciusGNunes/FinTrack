@@ -1,3 +1,5 @@
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace FinTrack.Controllers;
@@ -13,11 +15,22 @@ public class CategoriesController : ControllerBase
         _service = service;
     }
 
-    // GET: api/categories?userId=25
-    [HttpGet]
-    public async Task<ActionResult<IEnumerable<CategoryReadDto>>> GetForUser([FromQuery] int userId)
+    private int GetAuthenticatedUserId()
     {
-        var categories = await _service.GetForUserAsync(userId);
+        var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
+        if (int.TryParse(userIdClaim, out var userId))
+        {
+            return userId;
+        }
+        throw new UnauthorizedAccessException("Usuário não autenticado ou identificador inválido.");
+    }
+
+    // GET: api/categories
+    [HttpGet]
+    public async Task<ActionResult<IEnumerable<CategoryReadDto>>> GetForUser([FromQuery] int? userId)
+    {
+        var authUserId = GetAuthenticatedUserId();
+        var categories = await _service.GetForUserAsync(authUserId);
         return Ok(categories);
     }
 
@@ -43,11 +56,13 @@ public class CategoriesController : ControllerBase
             return BadRequest(ModelState);
         }
 
+        var authUserId = GetAuthenticatedUserId();
+        dto.UserID = authUserId;
         var created = await _service.CreateAsync(dto);
         return CreatedAtAction(nameof(GetById), new { id = created.CategoryID }, created);
     }
 
-    // PUT: api/categories/5?userId=25
+    // PUT: api/categories/5
     [HttpPut("{id:int}")]
     public async Task<IActionResult> Update(int id, [FromBody] CategoryUpdateDto dto, [FromQuery] int? userId)
     {
@@ -58,7 +73,8 @@ public class CategoriesController : ControllerBase
 
         try
         {
-            var updated = await _service.UpdateAsync(id, dto, userId);
+            var authUserId = GetAuthenticatedUserId();
+            var updated = await _service.UpdateAsync(id, dto, authUserId);
             if (!updated)
             {
                 return NotFound(new { message = $"Category with ID {id} was not found." });
@@ -72,13 +88,14 @@ public class CategoriesController : ControllerBase
         }
     }
 
-    // DELETE: api/categories/5?userId=25
+    // DELETE: api/categories/5
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> Delete(int id, [FromQuery] int? userId)
     {
         try
         {
-            var deleted = await _service.DeleteAsync(id, userId);
+            var authUserId = GetAuthenticatedUserId();
+            var deleted = await _service.DeleteAsync(id, authUserId);
             if (!deleted)
             {
                 return NotFound(new { message = $"Category with ID {id} was not found." });

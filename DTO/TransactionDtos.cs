@@ -18,15 +18,13 @@ public class TransactionCreateDto
     public PaymentMethod PaymentMethod { get; set; }
 
     public bool IsInstallment { get; set; }
-
-    [Range(1, 360)]
     public int TotalInstallments { get; set; } = 1;
 
     public bool IsRecurrent { get; set; }
     public RecurrenceInterval RecurrenceInterval { get; set; } = RecurrenceInterval.None;
     public DateTime FirstDueDate { get; set; } = DateTime.UtcNow;
 
-    public int UserID { get; set; }
+    public int? UserID { get; set; }
 }
 
 public class TransactionUpdateDto

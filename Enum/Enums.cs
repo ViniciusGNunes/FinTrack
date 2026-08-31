@@ -80,3 +80,39 @@ public enum InvestmentTransactionType
     Dividend = 3,     // Yield / Dividend payout
     StockSplit = 4    // Stock split / consolidation
 }
+
+public enum DebtType
+{
+    Personal = 0,
+    Bank = 1,
+    Student = 2,
+    Financing_Mortgage = 3,
+    CreditCard = 4,
+    Other = 5
+}
+
+public enum DebtRateType
+{
+    FixedAnnual = 0,
+    FixedMonthly = 1,
+    CDI_Linked = 2,
+    IPCA_Linked = 3
+}
+
+public enum GoalCategory
+{
+    MonthlyInvestment = 0,
+    MonthlyDebtReduction = 1,
+    ExpenseCap = 2,
+    TargetSavings = 3,
+    PortfolioMilestone = 4
+}
+
+public enum GoalFrequency
+{
+    Monthly = 0,
+    OneTimeTarget = 1,
+    Yearly = 2
+}
+
+

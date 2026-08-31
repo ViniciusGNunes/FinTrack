@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -10,9 +11,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace FinTrack.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260831030431_AddReceivablesFeature")]
+    partial class AddReceivablesFeature
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -237,75 +240,6 @@ namespace FinTrack.Migrations
                     b.HasIndex("TransactionID");
 
                     b.ToTable("Expenses");
-                });
-
-            modelBuilder.Entity("Goal", b =>
-                {
-                    b.Property<int>("GoalID")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("GoalID"));
-
-                    b.Property<bool>("AutoTrack")
-                        .HasColumnType("boolean");
-
-                    b.Property<int>("Category")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Currency")
-                        .IsRequired()
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)");
-
-                    b.Property<decimal>("CurrentAmount")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.Property<int>("Frequency")
-                        .HasColumnType("integer");
-
-                    b.Property<bool>("IsCompleted")
-                        .HasColumnType("boolean");
-
-                    b.Property<DateTime>("LastUpdatedUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int?>("LinkedCategoryID")
-                        .HasColumnType("integer");
-
-                    b.Property<int?>("LinkedDebtID")
-                        .HasColumnType("integer");
-
-                    b.Property<decimal>("TargetAmount")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<DateTime?>("TargetDate")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Title")
-                        .IsRequired()
-                        .HasMaxLength(150)
-                        .HasColumnType("character varying(150)");
-
-                    b.Property<int>("UserID")
-                        .HasColumnType("integer");
-
-                    b.HasKey("GoalID");
-
-                    b.HasIndex("LinkedCategoryID");
-
-                    b.HasIndex("LinkedDebtID");
-
-                    b.HasIndex("UserID");
-
-                    b.ToTable("Goals");
                 });
 
             modelBuilder.Entity("Investment", b =>
@@ -860,29 +794,6 @@ namespace FinTrack.Migrations
                         .IsRequired();
 
                     b.Navigation("Transaction");
-                });
-
-            modelBuilder.Entity("Goal", b =>
-                {
-                    b.HasOne("Category", "LinkedCategory")
-                        .WithMany()
-                        .HasForeignKey("LinkedCategoryID");
-
-                    b.HasOne("Debt", "LinkedDebt")
-                        .WithMany()
-                        .HasForeignKey("LinkedDebtID");
-
-                    b.HasOne("User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserID")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("LinkedCategory");
-
-                    b.Navigation("LinkedDebt");
-
-                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("Investment", b =>

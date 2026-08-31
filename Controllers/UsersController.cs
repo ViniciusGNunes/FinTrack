@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
@@ -17,32 +18,47 @@ public class UsersController : ControllerBase
         _configuration = configuration;
     }
 
-    [HttpGet]
-    [Authorize]
-    [ProducesResponseType(typeof(IEnumerable<UserDto>), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    public async Task<ActionResult<IEnumerable<UserDto>>> GetUsers()
+    private int GetAuthenticatedUserId()
     {
-        var users = await _userService.GetUsersAsync();
-        return Ok(users);
+        var userIdClaim = User.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
+        if (int.TryParse(userIdClaim, out var userId))
+        {
+            return userId;
+        }
+        throw new UnauthorizedAccessException("Usuário não autenticado ou identificador inválido.");
+    }
+
+    [HttpGet("me")]
+    [ProducesResponseType(typeof(UserDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<UserDto>> GetCurrentUser()
+    {
+        var authUserId = GetAuthenticatedUserId();
+        var user = await _userService.GetUserAsync(authUserId);
+        if (user is null)
+            return NotFound("Usuário não encontrado.");
+
+        return Ok(user);
     }
 
     [HttpGet("{userID:int}")]
-    [Authorize]
     [ProducesResponseType(typeof(UserDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<UserDto>> GetUser(int userID)
     {
-        var user = await _userService.GetUserAsync(userID);
+        var authUserId = GetAuthenticatedUserId();
+        // Ensure user can only read their own profile
+        var user = await _userService.GetUserAsync(authUserId);
 
         if (user is null)
-            return NotFound($"User with ID {userID} was not found.");
+            return NotFound($"User with ID {authUserId} was not found.");
 
         return Ok(user);
     }
 
     [HttpPost("register")]
+    [AllowAnonymous]
     [ProducesResponseType(typeof(object), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<ActionResult> Register([FromBody] RegisterDto register)
@@ -72,6 +88,7 @@ public class UsersController : ControllerBase
     }
 
     [HttpPost("login")]
+    [AllowAnonymous]
     [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<ActionResult> Login([FromBody] LoginDto login)
@@ -98,6 +115,7 @@ public class UsersController : ControllerBase
 
     // New Endpoint: Added a Logout handler since you are managing cookies now!
     [HttpPost("logout")]
+    [AllowAnonymous]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public IActionResult Logout()
     {
@@ -106,26 +124,25 @@ public class UsersController : ControllerBase
         return Ok(new { message = "Logged out successfully" });
     }
 
-    [HttpPut("{userID:int}")]
-    [Authorize]
+    [HttpPut("{userID:int?}")]
     [ProducesResponseType(typeof(UserDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
-    public async Task<ActionResult<UserDto>> Update(int userID, [FromBody] UpdateUserDto update)
+    public async Task<ActionResult<UserDto>> Update(int? userID, [FromBody] UpdateUserDto update)
     {
-        if (userID != update.UserID)
-            return BadRequest("Route ID does not match request body.");
+        var authUserId = GetAuthenticatedUserId();
+        update.UserID = authUserId;
 
         try
         {
             bool updated = await _userService.UpdateUserAsync(update);
 
             if (!updated)
-                return NotFound($"User with ID {userID} was not found.");
+                return NotFound($"User with ID {authUserId} was not found.");
 
-            var user = await _userService.GetUserAsync(userID);
+            var user = await _userService.GetUserAsync(authUserId);
             return Ok(user);
         }
         catch (InvalidOperationException ex)
@@ -134,17 +151,17 @@ public class UsersController : ControllerBase
         }
     }
 
-    [HttpDelete("{userID:int}")]
-    [Authorize]
+    [HttpDelete("{userID:int?}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> Delete(int userID)
+    public async Task<IActionResult> Delete(int? userID)
     {
-        bool deleted = await _userService.DeleteUserAsync(userID);
+        var authUserId = GetAuthenticatedUserId();
+        bool deleted = await _userService.DeleteUserAsync(authUserId);
 
         if (!deleted)
-            return NotFound($"User with ID {userID} was not found.");
+            return NotFound($"User with ID {authUserId} was not found.");
 
         return NoContent();
     }

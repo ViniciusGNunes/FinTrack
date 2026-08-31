@@ -1,3 +1,5 @@
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 [ApiController]
@@ -11,20 +13,32 @@ public class ExpensesController : ControllerBase
         _service = service;
     }
 
+    private int GetAuthenticatedUserId()
+    {
+        var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
+        if (int.TryParse(userIdClaim, out var userId))
+        {
+            return userId;
+        }
+        throw new UnauthorizedAccessException("Usuário não autenticado ou identificador inválido.");
+    }
+
     [HttpGet("monthly")]
     public async Task<ActionResult<IEnumerable<DetailedExpenseReadDto>>> GetMonthly(
-        [FromQuery] int userId,
+        [FromQuery] int? userId,
         [FromQuery] int month,
         [FromQuery] int year)
     {
-        var expenses = await _service.GetMonthlyExpensesAsync(userId, month, year);
+        var authUserId = GetAuthenticatedUserId();
+        var expenses = await _service.GetMonthlyExpensesAsync(authUserId, month, year);
         return Ok(expenses);
     }
 
     [HttpGet("overdue")]
-    public async Task<ActionResult<IEnumerable<DetailedExpenseReadDto>>> GetOverdue([FromQuery] int userId)
+    public async Task<ActionResult<IEnumerable<DetailedExpenseReadDto>>> GetOverdue([FromQuery] int? userId)
     {
-        var expenses = await _service.GetOverdueExpensesAsync(userId);
+        var authUserId = GetAuthenticatedUserId();
+        var expenses = await _service.GetOverdueExpensesAsync(authUserId);
         return Ok(expenses);
     }
 

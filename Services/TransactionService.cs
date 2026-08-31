@@ -142,7 +142,7 @@ public class TransactionService
             IsRecurrent = dto.IsRecurrent,
             RecurrenceInterval = dto.IsRecurrent ? dto.RecurrenceInterval : RecurrenceInterval.None,
             RecurrenceTargetDay = dto.IsRecurrent ? dto.FirstDueDate.Day : null,
-            UserID = dto.UserID,
+            UserID = dto.UserID.GetValueOrDefault(),
             CreatedAtUtc = DateTime.UtcNow
         };
 
