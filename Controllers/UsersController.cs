@@ -59,13 +59,87 @@ public class UsersController : ControllerBase
 
     [HttpPost("register")]
     [AllowAnonymous]
-    [ProducesResponseType(typeof(object), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<ActionResult> Register([FromBody] RegisterDto register)
     {
         try
         {
             var userDto = await _userService.RegisterUserAsync(register);
+
+            return Ok(new
+            {
+                message = "Cadastro realizado com sucesso! Enviamos um link de confirmação para o seu e-mail.",
+                requireEmailVerification = true,
+                email = userDto.Email
+            });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { message = ex.Message });
+        }
+    }
+
+    [HttpPost("confirm-email")]
+    [AllowAnonymous]
+    [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult> ConfirmEmail([FromBody] FinTrack.DTO.User.ConfirmEmailDto dto)
+    {
+        var success = await _userService.ConfirmEmailAsync(dto.UserId, dto.Token);
+        if (!success)
+        {
+            return BadRequest(new { message = "Link de confirmação inválido ou expirado." });
+        }
+
+        return Ok(new { message = "E-mail verificado com sucesso! Você já pode entrar na sua conta." });
+    }
+
+    [HttpPost("resend-confirmation")]
+    [AllowAnonymous]
+    [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+    public async Task<ActionResult> ResendConfirmation([FromBody] FinTrack.DTO.User.ResendConfirmationDto dto)
+    {
+        await _userService.ResendConfirmationEmailAsync(dto.Email);
+        return Ok(new { message = "Se houver uma conta pendente para este e-mail, um novo link de confirmação foi enviado." });
+    }
+
+    [HttpPost("forgot-password")]
+    [AllowAnonymous]
+    [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+    public async Task<ActionResult> ForgotPassword([FromBody] FinTrack.DTO.User.ForgotPasswordDto dto)
+    {
+        await _userService.ForgotPasswordAsync(dto.Email);
+        return Ok(new { message = "Se o e-mail estiver cadastrado, enviamos as instruções para redefinição de senha." });
+    }
+
+    [HttpPost("reset-password")]
+    [AllowAnonymous]
+    [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult> ResetPassword([FromBody] FinTrack.DTO.User.ResetPasswordDto dto)
+    {
+        var success = await _userService.ResetPasswordAsync(dto.UserId, dto.Token, dto.NewPassword);
+        if (!success)
+        {
+            return BadRequest(new { message = "Link de redefinição inválido, expirado ou senha não atende aos requisitos." });
+        }
+
+        return Ok(new { message = "Senha redefinida com sucesso! Você já pode entrar com sua nova senha." });
+    }
+
+    [HttpPost("login")]
+    [AllowAnonymous]
+    [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult> Login([FromBody] LoginDto login)
+    {
+        try
+        {
+            var userDto = await _userService.LoginAsync(login);
+
+            if (userDto is null)
+                return Unauthorized(new { message = "E-mail ou senha incorretos." });
 
             var userEntity = new User
             {
@@ -76,41 +150,14 @@ public class UsersController : ControllerBase
 
             var tokenString = _jwtService.GenerateToken(userEntity);
 
-            // Using the helper method now
             AppendAuthCookie(tokenString);
 
-            return Ok(new { message = "Registered and logged in successfully!" });
+            return Ok(new { message = "Login realizado com sucesso!" });
         }
         catch (InvalidOperationException ex)
         {
-            return Conflict(ex.Message);
+            return Unauthorized(new { message = ex.Message, isEmailUnconfirmed = true });
         }
-    }
-
-    [HttpPost("login")]
-    [AllowAnonymous]
-    [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    public async Task<ActionResult> Login([FromBody] LoginDto login)
-    {
-        var userDto = await _userService.LoginAsync(login);
-
-        if (userDto is null)
-            return Unauthorized("Invalid email or password.");
-
-        var userEntity = new User
-        {
-            Id = userDto.UserID,
-            Email = userDto.Email,
-            Name = userDto.Name
-        };
-
-        var tokenString = _jwtService.GenerateToken(userEntity);
-
-        // Using the helper method now
-        AppendAuthCookie(tokenString);
-
-        return Ok(new { message = "Logged in successfully!" });
     }
 
     // New Endpoint: Added a Logout handler since you are managing cookies now!

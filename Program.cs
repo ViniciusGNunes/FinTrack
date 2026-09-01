@@ -32,13 +32,15 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 
 builder.Services.AddIdentityCore<User>(options =>
 {
+    options.SignIn.RequireConfirmedEmail = true;
     options.Password.RequireDigit = false;
     options.Password.RequiredLength = 6;
     options.Password.RequireNonAlphanumeric = false;
     options.Password.RequireUppercase = false;
 })
 .AddRoles<IdentityRole<int>>()
-.AddEntityFrameworkStores<AppDbContext>();
+.AddEntityFrameworkStores<AppDbContext>()
+.AddDefaultTokenProviders();
 
 var jwtSettings = builder.Configuration.GetSection("Jwt");
 var key = Encoding.UTF8.GetBytes(jwtSettings["Secret"]!);
@@ -77,6 +79,7 @@ builder.Services.AddAuthentication(options =>
 builder.Services.AddAuthorization();
 
 builder.Services.AddHttpClient();
+builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<JwtService>();
 builder.Services.AddScoped<TransactionService>();

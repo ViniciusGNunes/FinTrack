@@ -8,17 +8,23 @@ public class UserService
     private readonly ILogger<UserService> _logger;
     private readonly UserManager<User> _userManager;
     private readonly JwtService _jwt;
+    private readonly IEmailService _emailService;
+    private readonly IConfiguration _configuration;
 
     public UserService(
         AppDbContext context,
         ILogger<UserService> logger,
         UserManager<User> userManager,
-        JwtService jwt)
+        JwtService jwt,
+        IEmailService emailService,
+        IConfiguration configuration)
     {
         _context = context;
         _logger = logger;
         _userManager = userManager;
         _jwt = jwt;
+        _emailService = emailService;
+        _configuration = configuration;
     }
 
     public async Task<List<UserDto>> GetUsersAsync()
@@ -91,9 +97,18 @@ public class UserService
                 throw new InvalidOperationException(errorMessages);
             }
 
+            // Generate cryptographic email confirmation token
+            var token = await _userManager.GenerateEmailConfirmationTokenAsync(user);
+            var encodedToken = Microsoft.AspNetCore.WebUtilities.WebEncoders.Base64UrlEncode(System.Text.Encoding.UTF8.GetBytes(token));
+
+            var frontendUrl = _configuration["FrontendUrl"] ?? "http://localhost:3000";
+            var verificationLink = $"{frontendUrl}/verify-email?userId={user.Id}&token={encodedToken}";
+
+            await _emailService.SendVerificationEmailAsync(user.Email!, user.Name, verificationLink);
+
             return new UserDto
             {
-                UserID = user.Id, // Already populated!
+                UserID = user.Id,
                 Name = user.Name,
                 Email = user.Email
             };
@@ -120,6 +135,10 @@ public class UserService
             if (!isPasswordValid)
                 return null;
 
+            if (!await _userManager.IsEmailConfirmedAsync(user))
+            {
+                throw new InvalidOperationException("Seu e-mail ainda não foi confirmado. Por favor, verifique sua caixa de entrada.");
+            }
 
             return new UserDto
             {
@@ -132,6 +151,76 @@ public class UserService
         {
             _logger.LogError(ex, "Error while logging in.");
             throw;
+        }
+    }
+
+    public async Task<bool> ConfirmEmailAsync(int userId, string token)
+    {
+        try
+        {
+            var user = await _userManager.FindByIdAsync(userId.ToString());
+            if (user is null) return false;
+
+            if (user.EmailConfirmed) return true;
+
+            var decodedBytes = Microsoft.AspNetCore.WebUtilities.WebEncoders.Base64UrlDecode(token);
+            var normalToken = System.Text.Encoding.UTF8.GetString(decodedBytes);
+
+            var result = await _userManager.ConfirmEmailAsync(user, normalToken);
+            return result.Succeeded;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error while confirming email for user {UserId}", userId);
+            return false;
+        }
+    }
+
+    public async Task ResendConfirmationEmailAsync(string email)
+    {
+        var user = await _userManager.FindByEmailAsync(email.Trim().ToLowerInvariant());
+        if (user is null || user.EmailConfirmed) return;
+
+        var token = await _userManager.GenerateEmailConfirmationTokenAsync(user);
+        var encodedToken = Microsoft.AspNetCore.WebUtilities.WebEncoders.Base64UrlEncode(System.Text.Encoding.UTF8.GetBytes(token));
+
+        var frontendUrl = _configuration["FrontendUrl"] ?? "http://localhost:3000";
+        var verificationLink = $"{frontendUrl}/verify-email?userId={user.Id}&token={encodedToken}";
+
+        await _emailService.SendVerificationEmailAsync(user.Email!, user.Name, verificationLink);
+    }
+
+    public async Task ForgotPasswordAsync(string email)
+    {
+        var user = await _userManager.FindByEmailAsync(email.Trim().ToLowerInvariant());
+        if (user is null) return; // Do not disclose whether email exists for security
+
+        var token = await _userManager.GeneratePasswordResetTokenAsync(user);
+        var encodedToken = Microsoft.AspNetCore.WebUtilities.WebEncoders.Base64UrlEncode(System.Text.Encoding.UTF8.GetBytes(token));
+
+        var frontendUrl = _configuration["FrontendUrl"] ?? "http://localhost:3000";
+        var resetLink = $"{frontendUrl}/reset-password?userId={user.Id}&token={encodedToken}";
+
+        await _emailService.SendPasswordResetEmailAsync(user.Email!, user.Name, resetLink);
+    }
+
+    public async Task<bool> ResetPasswordAsync(int userId, string token, string newPassword)
+    {
+        try
+        {
+            var user = await _userManager.FindByIdAsync(userId.ToString());
+            if (user is null) return false;
+
+            var decodedBytes = Microsoft.AspNetCore.WebUtilities.WebEncoders.Base64UrlDecode(token);
+            var normalToken = System.Text.Encoding.UTF8.GetString(decodedBytes);
+
+            var result = await _userManager.ResetPasswordAsync(user, normalToken, newPassword);
+            return result.Succeeded;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao redefinir senha para o usuário {UserId}", userId);
+            return false;
         }
     }
 
