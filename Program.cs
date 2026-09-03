@@ -6,6 +6,9 @@ using Microsoft.IdentityModel.Tokens;
 
 AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", false);
 
+// Prevent inotify file watcher limit crash in containerized Linux environments
+Environment.SetEnvironmentVariable("DOTNET_USE_POLLING_FILE_WATCHER", "true");
+
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddCors(options =>
