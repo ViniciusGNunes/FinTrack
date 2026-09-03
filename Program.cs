@@ -79,7 +79,10 @@ builder.Services.AddAuthentication(options =>
             OnMessageReceived = context =>
             {
                 var cookieName = builder.Configuration["CookieSettings:Name"] ?? "X-Access-Token";
-                context.Token = context.Request.Cookies[cookieName];
+                if (context.Request.Cookies.TryGetValue(cookieName, out var cookieToken))
+                {
+                    context.Token = cookieToken;
+                }
                 return Task.CompletedTask;
             }
         };

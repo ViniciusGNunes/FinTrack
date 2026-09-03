@@ -152,7 +152,11 @@ public class UsersController : ControllerBase
 
             AppendAuthCookie(tokenString);
 
-            return Ok(new { message = "Login realizado com sucesso!" });
+            return Ok(new 
+            { 
+                message = "Login realizado com sucesso!",
+                token = tokenString 
+            });
         }
         catch (InvalidOperationException ex)
         {
