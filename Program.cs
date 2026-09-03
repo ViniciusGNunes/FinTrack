@@ -10,10 +10,17 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddCors(options =>
 {
+    var frontendUrl = builder.Configuration["FrontendUrl"] ?? "http://localhost:3000";
+    var allowedOrigins = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    {
+        "http://localhost:3000",
+        frontendUrl.TrimEnd('/')
+    }.ToArray();
+
     options.AddPolicy("frontend", policy =>
     {
         policy
-            .WithOrigins("http://localhost:3000")
+            .WithOrigins(allowedOrigins)
             .AllowAnyHeader()
             .AllowAnyMethod()
             .AllowCredentials();
