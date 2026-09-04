@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Google.Apis.Auth;
 using FinTrack.DTO; 
 
 public class UserService
@@ -85,7 +86,8 @@ public class UserService
             {
                 Name = dto.Name.Trim(),
                 Email = email,
-                UserName = email
+                UserName = email,
+                EmailConfirmed = true
             };
 
             // EF Core automatically populates user.Id during this database insert tracking
@@ -96,15 +98,6 @@ public class UserService
                 var errorMessages = string.Join(" ", result.Errors.Select(e => e.Description));
                 throw new InvalidOperationException(errorMessages);
             }
-
-            // Generate cryptographic email confirmation token
-            var token = await _userManager.GenerateEmailConfirmationTokenAsync(user);
-            var encodedToken = Microsoft.AspNetCore.WebUtilities.WebEncoders.Base64UrlEncode(System.Text.Encoding.UTF8.GetBytes(token));
-
-            var frontendUrl = _configuration["FrontendUrl"] ?? "http://localhost:3000";
-            var verificationLink = $"{frontendUrl}/verify-email?userId={user.Id}&token={encodedToken}";
-
-            await _emailService.SendVerificationEmailAsync(user.Email!, user.Name, verificationLink);
 
             return new UserDto
             {
@@ -135,9 +128,62 @@ public class UserService
             if (!isPasswordValid)
                 return null;
 
-            if (!await _userManager.IsEmailConfirmedAsync(user))
+            return new UserDto
             {
-                throw new InvalidOperationException("Seu e-mail ainda não foi confirmado. Por favor, verifique sua caixa de entrada.");
+                UserID = user.Id,
+                Name = user.Name,
+                Email = user.Email
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error while logging in.");
+            throw;
+        }
+    }
+
+    public async Task<UserDto> GoogleLoginAsync(string idToken)
+    {
+        try
+        {
+            var clientId = _configuration["Google:ClientId"];
+            var settings = new GoogleJsonWebSignature.ValidationSettings();
+            if (!string.IsNullOrWhiteSpace(clientId))
+            {
+                settings.Audience = new[] { clientId };
+            }
+
+            var payload = await GoogleJsonWebSignature.ValidateAsync(idToken, settings);
+            if (payload is null)
+                throw new InvalidOperationException("Token do Google inválido.");
+
+            string email = payload.Email.Trim().ToLowerInvariant();
+            var user = await _userManager.FindByEmailAsync(email);
+
+            if (user is null)
+            {
+                // Auto register user
+                user = new User
+                {
+                    Name = !string.IsNullOrWhiteSpace(payload.Name) ? payload.Name.Trim() : payload.GivenName ?? "Usuário Google",
+                    Email = email,
+                    UserName = email,
+                    EmailConfirmed = true
+                };
+
+                // Generate secure random password for Identity store
+                var randomPassword = Guid.NewGuid().ToString("N") + "!1Aa";
+                var result = await _userManager.CreateAsync(user, randomPassword);
+                if (!result.Succeeded)
+                {
+                    var errorMessages = string.Join(" ", result.Errors.Select(e => e.Description));
+                    throw new InvalidOperationException(errorMessages);
+                }
+            }
+            else if (!user.EmailConfirmed)
+            {
+                user.EmailConfirmed = true;
+                await _userManager.UpdateAsync(user);
             }
 
             return new UserDto
@@ -149,7 +195,7 @@ public class UserService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error while logging in.");
+            _logger.LogError(ex, "Error while processing Google login.");
             throw;
         }
     }

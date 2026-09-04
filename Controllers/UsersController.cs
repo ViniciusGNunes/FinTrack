@@ -2,18 +2,26 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
+using FinTrack.DTO.User;
+using FinTrack.Services;
 
 [ApiController]
 [Route("v1/api/[controller]")]
 public class UsersController : ControllerBase
 {
     private readonly UserService _userService;
+    private readonly OAuthService _oauthService;
     private readonly JwtService _jwtService;
     private readonly IConfiguration _configuration;
 
-    public UsersController(UserService userService, JwtService jwtService, IConfiguration configuration)
+    public UsersController(
+        UserService userService, 
+        OAuthService oauthService,
+        JwtService jwtService, 
+        IConfiguration configuration)
     {
         _userService = userService;
+        _oauthService = oauthService;
         _jwtService = jwtService;
         _configuration = configuration;
     }
@@ -67,11 +75,21 @@ public class UsersController : ControllerBase
         {
             var userDto = await _userService.RegisterUserAsync(register);
 
+            var userEntity = new User
+            {
+                Id = userDto.UserID,
+                Email = userDto.Email,
+                Name = userDto.Name
+            };
+
+            var tokenString = _jwtService.GenerateToken(userEntity);
+            AppendAuthCookie(tokenString);
+
             return Ok(new
             {
-                message = "Cadastro realizado com sucesso! Enviamos um link de confirmação para o seu e-mail.",
-                requireEmailVerification = true,
-                email = userDto.Email
+                message = "Cadastro realizado com sucesso!",
+                token = tokenString,
+                user = userDto
             });
         }
         catch (InvalidOperationException ex)
@@ -161,6 +179,80 @@ public class UsersController : ControllerBase
         catch (InvalidOperationException ex)
         {
             return Unauthorized(new { message = ex.Message, isEmailUnconfirmed = true });
+        }
+    }
+
+    [HttpPost("google-login")]
+    [AllowAnonymous]
+    [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult> GoogleLogin([FromBody] FinTrack.DTO.User.GoogleLoginDto dto)
+    {
+        try
+        {
+            var userDto = await _userService.GoogleLoginAsync(dto.IdToken);
+
+            var userEntity = new User
+            {
+                Id = userDto.UserID,
+                Email = userDto.Email,
+                Name = userDto.Name
+            };
+
+            var tokenString = _jwtService.GenerateToken(userEntity);
+            AppendAuthCookie(tokenString);
+
+            return Ok(new
+            {
+                message = "Login com Google realizado com sucesso!",
+                token = tokenString,
+                user = userDto
+            });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = "Falha ao autenticar com o Google: " + ex.Message });
+        }
+    }
+
+    [HttpPost("oauth-login")]
+    [AllowAnonymous]
+    [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult> OAuthLogin([FromBody] OAuthLoginDto dto)
+    {
+        try
+        {
+            var userDto = await _oauthService.ProcessOAuthLoginAsync(dto);
+
+            var userEntity = new User
+            {
+                Id = userDto.UserID,
+                Email = userDto.Email,
+                Name = userDto.Name
+            };
+
+            var tokenString = _jwtService.GenerateToken(userEntity);
+            AppendAuthCookie(tokenString);
+
+            return Ok(new
+            {
+                message = $"Login com {dto.Provider} realizado com sucesso!",
+                token = tokenString,
+                user = userDto
+            });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = $"Falha ao autenticar com {dto.Provider}: {ex.Message}" });
         }
     }
 
