@@ -190,7 +190,24 @@ public class UsersController : ControllerBase
     {
         try
         {
-            var userDto = await _userService.GoogleLoginAsync(dto.IdToken);
+            UserDto userDto;
+            if (!string.IsNullOrWhiteSpace(dto.Code))
+            {
+                userDto = await _oauthService.ProcessOAuthLoginAsync(new OAuthLoginDto
+                {
+                    Provider = "google",
+                    Code = dto.Code,
+                    RedirectUri = dto.RedirectUri ?? string.Empty
+                });
+            }
+            else if (!string.IsNullOrWhiteSpace(dto.IdToken))
+            {
+                userDto = await _userService.GoogleLoginAsync(dto.IdToken);
+            }
+            else
+            {
+                return BadRequest(new { message = "Código ou Token do Google é obrigatório." });
+            }
 
             var userEntity = new User
             {

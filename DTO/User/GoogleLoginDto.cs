@@ -4,6 +4,7 @@ namespace FinTrack.DTO.User;
 
 public class GoogleLoginDto
 {
-    [Required(ErrorMessage = "O token do Google é obrigatório.")]
-    public string IdToken { get; set; } = string.Empty;
+    public string? IdToken { get; set; }
+    public string? Code { get; set; }
+    public string? RedirectUri { get; set; }
 }

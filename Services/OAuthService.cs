@@ -34,6 +34,7 @@ public class OAuthService
 
         OAuthUserInfo userInfo = provider switch
         {
+            "google" => await HandleGoogleLoginAsync(dto),
             "github" => await HandleGitHubLoginAsync(dto),
             "discord" => await HandleDiscordLoginAsync(dto),
             "twitter" or "x" => await HandleTwitterLoginAsync(dto),
@@ -84,6 +85,55 @@ public class OAuthService
             Email = user.Email
         };
     }
+
+    #region Google Provider
+    private async Task<OAuthUserInfo> HandleGoogleLoginAsync(OAuthLoginDto dto)
+    {
+        var clientId = _configuration["Google:ClientId"]
+                       ?? _configuration["Authentication:Google:ClientId"]
+                       ?? throw new InvalidOperationException("Google ClientId não configurado.");
+        var clientSecret = _configuration["Google:ClientSecret"]
+                           ?? _configuration["Authentication:Google:ClientSecret"]
+                           ?? throw new InvalidOperationException("Google ClientSecret não configurado.");
+
+        var client = _httpClientFactory.CreateClient();
+        var tokenRequest = new HttpRequestMessage(HttpMethod.Post, "https://oauth2.googleapis.com/token")
+        {
+            Content = new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["client_id"] = clientId,
+                ["client_secret"] = clientSecret,
+                ["code"] = dto.Code,
+                ["grant_type"] = "authorization_code",
+                ["redirect_uri"] = !string.IsNullOrWhiteSpace(dto.RedirectUri) ? dto.RedirectUri : "postmessage"
+            })
+        };
+
+        var tokenResponse = await client.SendAsync(tokenRequest);
+        var tokenBody = await tokenResponse.Content.ReadAsStringAsync();
+
+        if (!tokenResponse.IsSuccessStatusCode)
+        {
+            _logger.LogError("Google token exchange failed: {Body}", tokenBody);
+            throw new InvalidOperationException("Falha ao autenticar com o Google. Código inválido ou expirado.");
+        }
+
+        var tokenData = JsonSerializer.Deserialize<JsonElement>(tokenBody);
+        var idToken = tokenData.GetProperty("id_token").GetString()!;
+
+        var payload = await Google.Apis.Auth.GoogleJsonWebSignature.ValidateAsync(idToken, new Google.Apis.Auth.GoogleJsonWebSignature.ValidationSettings
+        {
+            Audience = new[] { clientId }
+        });
+
+        return new OAuthUserInfo
+        {
+            Provider = "Google",
+            Name = !string.IsNullOrWhiteSpace(payload.Name) ? payload.Name : payload.GivenName ?? "Usuário Google",
+            Email = payload.Email
+        };
+    }
+    #endregion
 
     #region GitHub Provider
 
