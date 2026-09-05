@@ -5,6 +5,8 @@ using Microsoft.IdentityModel.Tokens;
 using FinTrack.DTO.User;
 using FinTrack.Services;
 
+namespace FinTrack.Controllers;
+
 [ApiController]
 [Route("v1/api/[controller]")]
 public class UsersController : ControllerBase
